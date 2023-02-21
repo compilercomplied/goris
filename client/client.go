@@ -1,19 +1,14 @@
 package client
 
 import (
-	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
+	"goris/common"
 
 	"golang.org/x/sys/unix"
 )
 
 func ExecuteClient() {
-	const PROTOCOL_HEADER int = 4
-	const MAX_SIZE int = 4096
-
-	const PORT int = 5000
 
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
 
@@ -28,7 +23,7 @@ func ExecuteClient() {
 	hostAddr := make([]byte, 4)
 	binary.BigEndian.PutUint32(hostAddr, 0)
 	addr := unix.SockaddrInet4{
-		Port: PORT,
+		Port: common.DEF_SERVER_PORT,
 		Addr: [4]byte(hostAddr),
 	}
 
@@ -40,48 +35,17 @@ func ExecuteClient() {
 	}
 
 	msg := "hello"
+	err = common.WriteMessage(fd, msg)
 
-	header := make([]byte, 4)
-	var headerv uint32 = uint32(len(msg))
-	binary.LittleEndian.PutUint32(header, headerv)
-
-	buffer := bytes.NewBuffer(header)
-	if err != nil {
-		panic(err)
-	}
-	_, err = buffer.Write([]byte(msg))
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = unix.Write(fd, buffer.Bytes())
-	fmt.Println("sent msg")
+	response, err := common.ReadMessage(fd)
 	if err != nil {
 		panic(err)
 	}
 
-	respbuffer := make([]byte, MAX_SIZE+PROTOCOL_HEADER+1)
-	nread, err := unix.Read(fd, respbuffer)
-	if nread < 0 {
-		panic(errors.New("nread is less than zero"))
-	} else if err != nil {
-		panic(err)
-	}
-	buf := bytes.NewBuffer(respbuffer)
-
-	respheader := make([]byte, 4)
-	_, err = buf.Read(respheader)
-	if err != nil {
-		panic(err)
-	}
-
-	contentLength := binary.LittleEndian.Uint32(respheader)
-	data := make([]byte, contentLength)
-	_, err = buf.Read(data)
-	if err != nil {
-		panic(err)
-	}
-	decodedPayload := string(data)
-	fmt.Printf("msg from server: %s", decodedPayload)
+	fmt.Printf("msg from server: %s", response)
 
 }
