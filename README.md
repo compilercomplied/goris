@@ -4,4 +4,4 @@ Redis implementation in golang for educational purposes.
 
 # Running
 
-A client app is included to easily test this. To run each component simply use `go run .` at their corresponding root dirs.
+To execute a test run each component simply use `go run .` at the root dir. It'll execute the whole flow of setting up a server and connecting with the defined client instances.
