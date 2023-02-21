@@ -46,6 +46,6 @@ func ExecuteClient() {
 		panic(err)
 	}
 
-	fmt.Printf("msg from server: %s", response)
+	fmt.Printf("msg from server: %s\n", response)
 
 }

@@ -59,8 +59,14 @@ func bindNewSocket(port int) (fd int, err error) {
 
 }
 func socketLoop(fd int) {
-
+	const max_connections int = 1
+	var current_connections int = 0
 	for {
+		if current_connections == max_connections {
+			fmt.Println("Max connections for server reached")
+			break
+		}
+
 		connfd, _, err := unix.Accept(fd)
 
 		if err != nil {
@@ -83,6 +89,7 @@ func socketLoop(fd int) {
 		}
 
 		unix.Close(connfd)
+		current_connections++
 
 	}
 
