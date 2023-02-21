@@ -1,12 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"golang.org/x/sys/unix"
 )
 
 func socketLoop(fd int) {
+
+	const PROTOCOL_HEADER int = 4
+	const MAX_SIZE int = 4096
 
 	for {
 		connfd, _, err := unix.Accept(fd)
@@ -16,33 +22,53 @@ func socketLoop(fd int) {
 		}
 		fmt.Println("Connection made")
 
-		if connfd < 0 {
-			fmt.Println("Error: connfd is less than zero")
-			continue
-		}
-
 		// --- refactor block later --------------------------------------------
-		payload := make([]byte, 64)
-		nread, err := unix.Read(connfd, payload)
+		buffer := make([]byte, MAX_SIZE+PROTOCOL_HEADER+1)
+		nread, err := unix.Read(connfd, buffer)
+		if nread < 0 {
+			continue
+		} else if err != nil {
+			panic(err)
+		}
+		buf := bytes.NewBuffer(buffer)
+
+		header := make([]byte, 4)
+		_, err = buf.Read(header)
 		if err != nil {
 			panic(err)
 		}
-		if nread < 0 {
-			fmt.Println("Error reading data")
-			continue
+
+		contentLength := binary.LittleEndian.Uint32(header)
+		data := make([]byte, contentLength)
+		_, err = buf.Read(data)
+		if err != nil {
+			panic(err)
 		}
 
-		decodedPayload := string(payload)
+		decodedPayload := string(data)
 		fmt.Printf("msg from client: %s\n", decodedPayload)
 
 		serverResponse := fmt.Sprintf("right back at you -> %s", decodedPayload)
-		nwrite, err := unix.Write(connfd, []byte(serverResponse))
+
+		// codify response
+		respheader := make([]byte, 4)
+		var headerv uint32 = uint32(len(serverResponse))
+		binary.LittleEndian.PutUint32(respheader, headerv)
+
+		respbuffer := bytes.NewBuffer(respheader)
 		if err != nil {
 			panic(err)
 		}
-		if nwrite < 0 {
-			fmt.Println("Error writing data")
-			continue
+		_, err = respbuffer.Write([]byte(serverResponse))
+		if err != nil {
+			panic(err)
+		}
+
+		nwrite, err := unix.Write(connfd, respbuffer.Bytes())
+		if err != nil {
+			panic(err)
+		} else if nwrite < 0 {
+			panic(errors.New("error writing data"))
 		}
 
 		unix.Close(connfd)
