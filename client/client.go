@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func main() {
+func ExecuteClient() {
 	const PROTOCOL_HEADER int = 4
 	const MAX_SIZE int = 4096
 
