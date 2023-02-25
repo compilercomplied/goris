@@ -4,4 +4,15 @@ Redis implementation in golang for educational purposes.
 
 # Running
 
-To execute a test run each component simply use `go run .` at the root dir. It'll execute the whole flow of setting up a server and connecting with the defined client instances.
+There are executables available under the `cmd` dir. One for a test client and another one for the server.
+```sh
+# On the root dir.
+
+go run ./cmd/client
+
+go run ./cmd/server
+```
+
+# Development
+
+To execute the tests run `go test -v ./...` to recursively expand on subdirs. Verbosity flag provides information about the tests that have been run.
