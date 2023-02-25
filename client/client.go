@@ -35,13 +35,23 @@ func ExecuteClient() {
 	}
 
 	msg := "hello"
-	err = common.WriteMessage(fd, msg)
-
+	wbuffer, err := common.WriteToBuffer(msg)
 	if err != nil {
 		panic(err)
 	}
 
-	response, err := common.ReadMessage(fd)
+	_, err = unix.Write(fd, *wbuffer)
+	if err != nil {
+		panic(err)
+	}
+
+	buffer := common.InitializeReadBuffer()
+	_, err = unix.Read(fd, buffer)
+	if err != nil {
+		panic(err)
+	}
+
+	response, err := common.ReadFromBuffer(&buffer)
 	if err != nil {
 		panic(err)
 	}

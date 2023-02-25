@@ -59,8 +59,10 @@ func bindNewSocket(port int) (fd int, err error) {
 
 }
 func socketLoop(fd int) {
+
 	const max_connections int = 1
-	var current_connections int = 0
+	var current_connections = 0
+
 	for {
 		if current_connections == max_connections {
 			fmt.Println("Max connections for server reached")
@@ -74,7 +76,14 @@ func socketLoop(fd int) {
 		}
 		fmt.Println("Connection made")
 
-		message, err := common.ReadMessage(connfd)
+		buffer := common.InitializeReadBuffer()
+		_, err = unix.Read(connfd, buffer)
+		if err != nil {
+			panic(err)
+		}
+
+		
+		message, err := common.ReadFromBuffer(&buffer)
 		if err != nil {
 			panic(err)
 		}
@@ -83,7 +92,11 @@ func socketLoop(fd int) {
 
 		serverResponse := fmt.Sprintf("right back at you -> %s", message)
 
-		err = common.WriteMessage(connfd, serverResponse)
+		wbuffer, err := common.WriteToBuffer(serverResponse)
+		if err != nil {
+			panic(err)
+		}
+		_, err = unix.Write(connfd, *wbuffer)
 		if err != nil {
 			panic(err)
 		}
