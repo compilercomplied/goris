@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"goris/common"
@@ -40,22 +41,24 @@ func ExecuteClient() {
 		panic(err)
 	}
 
-	_, err = unix.Write(fd, *wbuffer)
+	_, err = unix.Write(fd, wbuffer.Bytes())
 	if err != nil {
 		panic(err)
 	}
 
-	buffer := common.InitializeReadBuffer()
-	_, err = unix.Read(fd, buffer)
+	buffer := bytes.NewBuffer(make([]byte, common.MESSAGE_MAX_SIZE+common.PROTOCOL_HEADER+1))
+	_, err = unix.Read(fd, buffer.Bytes())
 	if err != nil {
 		panic(err)
 	}
 
-	response, err := common.ReadFromBuffer(&buffer)
+	response, err := common.ReadFromBuffer(buffer)
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Printf("msg from server: %s\n", response)
+
+	unix.Close(fd)
 
 }
