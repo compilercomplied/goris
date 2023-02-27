@@ -13,6 +13,9 @@ func tryOneRequest(connection *Connection) bool {
 
 	msg, err := common.ReadFromBuffer(&connection.rbuf)
 
+	drainedBuffer := bytes.NewBuffer(connection.rbuf.Bytes())
+	connection.rbuf = *drainedBuffer
+
 	if err != nil {
 		return false
 	}
@@ -78,30 +81,31 @@ func tryFillBuffer(connection *Connection) (bool, error) {
 	var rv int
 	var errno error
 	for loop := true; loop; loop = !breakloop {
-
-		rv, errno = unix.Read(connection.fd, connection.rbuf.Bytes())
+		buffer := make([]byte, 64)
+		rv, errno = unix.Read(connection.fd, buffer)
 
 		// Internally, Go's `read()` `executes Syscall()` which returns
 		// `syscall.Errno` as the error value.
 		breakloop = rv >= 0 && errno != unix.EINTR
+
+		if rv > 0 {
+			connection.rbuf.Write(buffer)
+		}
 	}
 
 	if rv < 0 && errno == unix.EAGAIN {
-		return true, errors.New("EAGAIN")
+		return true, nil
 	}
 
-	if rv < 0 {
+	if rv < 0 && errno != nil {
 		connection.state = END_ST
-		return true, errors.New("EAGAIN")
+		return true, errno
+	} else if rv < 0 {
+		return true, errors.New("unexpected negative unix.Read() without errors")
 	}
 
 	if rv == 0 {
-		if connection.rbuf.Len() > 0 {
-			fmt.Println("Unexpected EOF")
-		} else {
-			fmt.Println("EOF")
-		}
-
+		// No more data to be read on this buffer.
 		connection.state = END_ST
 		return true, nil
 	}
@@ -272,6 +276,8 @@ func loopCycle(mainFd int, connections map[int32]*Connection) {
 				if err != nil {
 					panic(err)
 				}
+
+				delete(connections, int32(connection.fd))
 			}
 
 		} else {
