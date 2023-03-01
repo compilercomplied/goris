@@ -1,9 +1,12 @@
 package main
 
-import "goris/server"
+import (
+	"goris/common"
+	"goris/server"
+)
 
 func main() {
 
-	server.ExecuteServer()
+	server.ExecuteServer(common.DEF_SERVER_PORT)
 
 }

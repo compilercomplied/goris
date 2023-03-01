@@ -1,16 +1,12 @@
 package server
 
 import (
-	"goris/common"
-
 	"golang.org/x/sys/unix"
 )
 
 const POLLING_TIMEOUT_MS int = 3000
 
-
-
-func initializeSocket(port int) (int) {
+func initializeSocket(port int) int {
 
 	fd, err := bindMasterFd(port)
 
@@ -23,9 +19,9 @@ func initializeSocket(port int) (int) {
 	return fd
 }
 
-func ExecuteServer() {
+func ExecuteServer(port int) {
 
-	fd := initializeSocket(common.DEF_SERVER_PORT)
+	fd := initializeSocket(port)
 
 	eventLoopInit(fd)
 

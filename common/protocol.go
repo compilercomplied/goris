@@ -10,25 +10,55 @@ const PROTOCOL_HEADER int = 4
 const MESSAGE_MAX_SIZE int = 4096
 const MESSAGE_LENGTH int = PROTOCOL_HEADER + MESSAGE_MAX_SIZE + 1
 
-func ReadFromBuffer(buffer *bytes.Buffer) (string, error) {
+func ReadRequestFromBuffer(buffer *bytes.Buffer) (data []byte, remaining bool, err error) {
 
 	header := make([]byte, PROTOCOL_HEADER)
-	_, err := buffer.Read(header)
+	_, err = buffer.Read(header)
 	if err != nil {
-		return "", err
+		return data, remaining, err
 	}
 
 	contentLength := binary.LittleEndian.Uint32(header)
-	data := make([]byte, contentLength)
+	if contentLength <= 0 {
+		return data, remaining, errors.New("no requests")
+	}
+	data = make([]byte, contentLength)
+
 	_, err = buffer.Read(data)
+	if err != nil {
+		return data, remaining, err
+	}
+
+	rv, err := buffer.ReadByte()
+	if rv == 0 || err != nil {
+		remaining = false
+	} else {
+		remaining = true
+		buffer.UnreadByte()
+	}
+
+	// Return the fully formed response; [header][data].
+	return append(header, data...), remaining, nil
+
+}
+
+func ReadFromBuffer(buffer *bytes.Buffer) (string, error) {
+
+	data, _, err := ReadRequestFromBuffer(buffer)
 	if err != nil {
 		return "", err
 	}
 
-	return string(data), nil
+	// Skip the header; we only want the payload.
+	return string(data[PROTOCOL_HEADER:]), nil
 }
 
-func WriteToBuffer(msg string) (*bytes.Buffer, error) {
+func AppendToBuffer(msg string, buffer *bytes.Buffer) (*bytes.Buffer, error) {
+
+	if buffer == nil {
+		buffer = bytes.NewBuffer(make([]byte, 0))
+	}
+
 	msglength := len(msg)
 	if msglength > MESSAGE_MAX_SIZE {
 		return nil, errors.New("message too long")
@@ -38,9 +68,11 @@ func WriteToBuffer(msg string) (*bytes.Buffer, error) {
 	var headerv = uint32(len(msg))
 	binary.LittleEndian.PutUint32(header, headerv)
 
-	buffer := bytes.NewBuffer(header)
-	_, err := buffer.Write([]byte(msg))
-
+	_, err := buffer.Write(header)
+	if err != nil {
+		return nil, err
+	}
+	_, err = buffer.Write([]byte(msg))
 	if err != nil {
 		return nil, err
 	}

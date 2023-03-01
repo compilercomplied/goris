@@ -3,10 +3,10 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
-	"strings"
 	"testing"
 )
 
+// --- READ --------------------------------------------------------------------
 func Test_ReadMessageFromBuffer_OK(t *testing.T) {
 
 	const msg string = "hello"
@@ -28,7 +28,25 @@ func Test_ReadMessageFromBuffer_OK(t *testing.T) {
 	}
 	if parsedMessage != msg {
 		t.Fatalf("expected message '%s' but got '%s' instead", msg, parsedMessage)
+	}
 
+}
+
+func Test_ReadMessageFromEmptyBuffer_Errors(t *testing.T) {
+
+	// --- Setup -----------------------------------------------------------------
+	buffer := bytes.NewBuffer(make([]byte, 10))
+
+	// --- Execute ---------------------------------------------------------------
+	_, err := ReadFromBuffer(buffer)
+
+	// --- Assert ----------------------------------------------------------------
+	if err == nil {
+		t.Fatal("expected error but got none")
+	}
+
+	if err.Error() != "no requests" {
+		t.Fatalf("expected message '%s' but got '%s' instead", "no more messages", err.Error())
 	}
 
 }
@@ -47,16 +65,13 @@ func Test_ReadMessageFromBuffer_MovesCursor(t *testing.T) {
 
 	// --- Execute ---------------------------------------------------------------
 	_, _ = ReadFromBuffer(buffer)
-	nomsg, err := ReadFromBuffer(buffer)
 
 	// --- Assert ----------------------------------------------------------------
+	nomsg, err := ReadFromBuffer(buffer)
 
 	if nomsg == msg {
 		t.Fatalf("expected no message but got '%s' instead", nomsg)
-	}
 
-	if err == nil {
-		t.Fatalf("expected an error but got none")
 	}
 
 	if err.Error() != "EOF" {
@@ -65,11 +80,12 @@ func Test_ReadMessageFromBuffer_MovesCursor(t *testing.T) {
 
 }
 
-func Test_WriteToBuffer_OK(t *testing.T) {
+// --- APPEND ------------------------------------------------------------------
+func Test_AppendToNilBuffer_OK(t *testing.T) {
 	const msg string = "hello"
 
 	// --- Execute ---------------------------------------------------------------
-	buffer, err := WriteToBuffer(msg)
+	buffer, err := AppendToBuffer(msg, nil)
 
 	// --- Assert ----------------------------------------------------------------
 	if err != nil {
@@ -97,26 +113,96 @@ func Test_WriteToBuffer_OK(t *testing.T) {
 
 }
 
-func Test_WriteToBuffer_SizeLimit_Errors(t *testing.T) {
-	const overflowingLength = MESSAGE_MAX_SIZE + 1
-	var sb strings.Builder
-	for i := 0; i < overflowingLength; i++ {
-		sb.WriteString("x")
-	}
-
-	longmessage := sb.String()
+func Test_AppendToExistingBuffer_OK(t *testing.T) {
+	const msg string = "hello"
+	existingBuffer := bytes.NewBuffer(make([]byte, 0))
+	existingBuffer.WriteByte(1)
 
 	// --- Execute ---------------------------------------------------------------
-	_, err := WriteToBuffer(longmessage)
+	buffer, err := AppendToBuffer(msg, existingBuffer)
+	// Remove the leading byte. If the data is not being appended it
+	_, _ = existingBuffer.ReadByte()
+
+	// --- Assert ----------------------------------------------------------------
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	header := make([]byte, PROTOCOL_HEADER)
+	_, err = buffer.Read(header)
+	if err != nil {
+		t.Fatalf("found error '%s'", err.Error())
+	}
+
+	contentLength := binary.LittleEndian.Uint32(header)
+	data := make([]byte, contentLength)
+	_, err = buffer.Read(data)
+	if err != nil {
+		t.Fatalf("found error '%s'", err.Error())
+	}
+
+	parsedMessage := string(data)
+
+	if parsedMessage != msg {
+		t.Fatalf("expected message '%s' but got '%s' instead", msg, parsedMessage)
+	}
+
+}
+
+func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
+
+	const msg string = "hello"
+	var longmessage string
+	for i := 0; i < MESSAGE_MAX_SIZE; i++ {
+		longmessage = msg + longmessage
+	}
+
+	// --- Execute ---------------------------------------------------------------
+	_, err := AppendToBuffer(longmessage, nil)
 
 	// --- Assert ----------------------------------------------------------------
 	if err == nil {
-		t.Fatalf("expected an error but got none")
+		t.Fatal("expected error but got none")
 	}
 
-	errmsg := err.Error()
-	if errmsg != "message too long" {
-		t.Fatalf("expected error 'message too long' but got '%s' instead", errmsg)
+	if err.Error() != "message too long" {
+		t.Fatalf("expected message '%s' but got '%s' instead", msg, err.Error())
+	}
+
+}
+
+// --- SLICE -------------------------------------------------------------------
+func Test_SliceRequestFromBuffer_OK(t *testing.T) {
+
+	const firstmsg string = "first message"
+	const secondmsg string = "second message"
+
+	// --- Setup -----------------------------------------------------------------
+	buffer, _ := AppendToBuffer(firstmsg, nil)
+	buffer, _ = AppendToBuffer(secondmsg, buffer)
+
+	// --- Execute ---------------------------------------------------------------
+	first, remaining, err := ReadRequestFromBuffer(buffer)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// --- Assert ----------------------------------------------------------------
+
+	firstResponse, _ := ReadFromBuffer(bytes.NewBuffer(first))
+	secondResponse, _ := ReadFromBuffer(buffer)
+
+	if !remaining {
+		t.Fatalf("there were more requests that went undetected")
+	}
+
+	if firstResponse != firstmsg {
+		t.Fatalf("expected message '%s' but got '%s' instead", firstmsg, firstResponse)
+	}
+
+	if secondResponse != secondmsg {
+		t.Fatalf("expected message '%s' but got '%s' instead", secondmsg, secondResponse)
 	}
 
 }

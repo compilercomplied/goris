@@ -13,26 +13,26 @@ func tryOneRequest(connection *Connection) bool {
 
 	msg, err := common.ReadFromBuffer(&connection.rbuf)
 
+	if err != nil {
+		return true
+	}
+
 	drainedBuffer := bytes.NewBuffer(connection.rbuf.Bytes())
 	connection.rbuf = *drainedBuffer
 
-	if err != nil {
-		return false
-	}
-
 	fmt.Println("Request received from client -> " + msg)
 
-	wbuf, err := common.WriteToBuffer("echo: " + msg)
+	wbuf, err := common.AppendToBuffer("echo: "+msg, &connection.wbuf)
 	if err != nil {
 		fmt.Println("Error writing response to buffer" + msg)
-		// return true anyway because we've finished reading the request
+		// Return true anyway because we've finished reading the request.
 		return true
 	}
 
 	connection.state = RESPONSE_ST
 	connection.wbuf = *wbuf
 
-	return true
+	return false
 }
 
 func sendResponse(connection *Connection) {
@@ -51,11 +51,17 @@ func tryFlushBuffer(connection *Connection) bool {
 	var errno error
 	for loop := true; loop; loop = !breakloop {
 
-		rv, errno = unix.Write(connection.fd, connection.wbuf.Bytes())
+		response, remaining, err := common.ReadRequestFromBuffer(&connection.wbuf)
+
+		if err != nil {
+			break
+		}
+
+		rv, errno = unix.Write(connection.fd, response)
 
 		// Internally, Go's `read()` `executes Syscall()` which returns
 		// `syscall.Errno` as the error value.
-		breakloop = rv >= 0 && errno != unix.EINTR
+		breakloop = rv >= 0 && errno != unix.EINTR && !remaining
 	}
 
 	if rv < 0 && errno == unix.EAGAIN {
@@ -86,7 +92,7 @@ func tryFillBuffer(connection *Connection) (bool, error) {
 
 		// Internally, Go's `read()` `executes Syscall()` which returns
 		// `syscall.Errno` as the error value.
-		breakloop = rv >= 0 && errno != unix.EINTR
+		breakloop = rv <= 0 && errno != unix.EINTR
 
 		if rv > 0 {
 			connection.rbuf.Write(buffer)
@@ -110,15 +116,6 @@ func tryFillBuffer(connection *Connection) (bool, error) {
 		return true, nil
 	}
 
-	if connection.state != REQUEST_ST {
-		return true, errors.New("expected connection state request")
-	}
-
-	breakloop = false
-	for loop := true; loop; loop = !breakloop {
-		breakloop = tryOneRequest(connection)
-	}
-
 	return true, nil
 
 }
@@ -135,6 +132,15 @@ func handleRequest(connection *Connection) error {
 		if finished {
 			break
 		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	breakloop = false
+	for loop := true; loop; loop = !breakloop {
+		breakloop = tryOneRequest(connection)
 	}
 
 	return err
