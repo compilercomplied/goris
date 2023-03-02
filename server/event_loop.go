@@ -9,6 +9,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const POLLING_TIMEOUT_MS int = 3000
+
 func processOneRequest(connection *Connection) bool {
 
 	// Read the request ----------------------------------------------------------
@@ -41,12 +43,12 @@ func sendResponse(connection *Connection) {
 
 	breakloop := false
 	for loop := true; loop; loop = !breakloop {
-		breakloop = !tryFlushBuffer(connection)
+		breakloop = !flushBuffer(connection)
 	}
 
 }
 
-func tryFlushBuffer(connection *Connection) bool {
+func flushBuffer(connection *Connection) bool {
 
 	breakloop := false
 	var rv int

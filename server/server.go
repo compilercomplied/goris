@@ -4,8 +4,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const POLLING_TIMEOUT_MS int = 3000
-
 func initializeSocket(port int) int {
 
 	fd, err := bindMainFd(port)
