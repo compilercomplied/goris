@@ -9,8 +9,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func tryOneRequest(connection *Connection) bool {
+func processOneRequest(connection *Connection) bool {
 
+	// Read the request ----------------------------------------------------------
 	msg, err := common.ReadFromBuffer(&connection.rbuf)
 
 	if err != nil {
@@ -22,6 +23,7 @@ func tryOneRequest(connection *Connection) bool {
 
 	fmt.Println("Request received from client -> " + msg)
 
+	// Echo back its contents ----------------------------------------------------
 	wbuf, err := common.AppendToBuffer("echo: "+msg, &connection.wbuf)
 	if err != nil {
 		fmt.Println("Error writing response to buffer" + msg)
@@ -80,7 +82,7 @@ func tryFlushBuffer(connection *Connection) bool {
 	return false
 }
 
-func tryFillBuffer(connection *Connection) (bool, error) {
+func readIncomingRequests(connection *Connection) (bool) {
 
 	// Read the whole fd buffer into our connection read buffer.
 	breakloop := false
@@ -100,54 +102,45 @@ func tryFillBuffer(connection *Connection) (bool, error) {
 	}
 
 	if rv < 0 && errno == unix.EAGAIN {
-		return true, nil
+		return false
 	}
 
 	if rv < 0 && errno != nil {
 		connection.state = END_ST
-		return true, errno
+		return false
 	} else if rv < 0 {
-		return true, errors.New("unexpected negative unix.Read() without errors")
+		fmt.Println("unexpected negative unix.Read() without errors")
+		return false
 	}
 
 	if rv == 0 {
 		// No more data to be read on this buffer.
 		connection.state = END_ST
-		return true, nil
+		return false
 	}
 
-	return true, nil
+	return true
 
 }
 
 func handleRequest(connection *Connection) error {
 
 	breakloop := false
-	var err error = nil
 	for loop := true; loop; loop = !breakloop {
-		finished, err := tryFillBuffer(connection)
-		if err != nil {
-			breakloop = true
-		}
-		if finished {
-			break
-		}
+		breakloop = !readIncomingRequests(connection)
 	}
 
-	if err != nil {
-		return err
-	}
-
+	var err error = nil
 	breakloop = false
 	for loop := true; loop; loop = !breakloop {
-		breakloop = tryOneRequest(connection)
+		breakloop = !processOneRequest(connection)
 	}
 
 	return err
 
 }
 
-func mutateConnectionBuffers(connection *Connection) error {
+func dispatchConnectionEvent(connection *Connection) error {
 	switch connection.state {
 	case REQUEST_ST:
 		handleRequest(connection)
@@ -241,9 +234,8 @@ func loopCycle(mainFd int, connections map[int32]*Connection) {
 	fmt.Printf("polling with pollargs length '%v'\n", len(pollArgs))
 	_, err := unix.Poll(pollArgs, POLLING_TIMEOUT_MS)
 	if err != nil {
-		// TODO: handle some of its panics.
-		// panic: interrupted system call
-		panic(err)
+		fmt.Printf("Error polling: '%s'\n", err.Error())
+		return
 	}
 
 	fmt.Println("polled pollargs")
@@ -272,7 +264,7 @@ func loopCycle(mainFd int, connections map[int32]*Connection) {
 			fmt.Println("Revents for connection")
 
 			connection := connections[currentPoll.Fd]
-			err = mutateConnectionBuffers(connection)
+			err = dispatchConnectionEvent(connection)
 			if err != nil {
 				panic(err)
 			}
