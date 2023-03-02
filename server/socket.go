@@ -9,7 +9,7 @@ import (
 )
 
 
-func bindMasterFd(port int) (fd int, err error) {
+func bindMainFd(port int) (fd int, err error) {
 
 	// AF_INET:
 	//  - IPv4 Internet protocols.

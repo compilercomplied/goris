@@ -8,7 +8,7 @@ const POLLING_TIMEOUT_MS int = 3000
 
 func initializeSocket(port int) int {
 
-	fd, err := bindMasterFd(port)
+	fd, err := bindMainFd(port)
 
 	if err != nil {
 		panic(err)
