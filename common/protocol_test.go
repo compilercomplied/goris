@@ -3,8 +3,26 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"testing"
 )
+
+func TestErrWhenMsgLength(t *testing.T) {
+	b := make([]rune, MESSAGE_MAX_SIZE+1)
+	for i := range b {
+		b[i] = 'a'
+	}
+	invalidLengthMsg := string(b)
+
+	want := fmt.Sprintf("message length was %d, max size is: %d", MESSAGE_MAX_SIZE+1, MESSAGE_MAX_SIZE)
+	_, err := AppendToBuffer(invalidLengthMsg, nil)
+	if err == nil {
+		t.Fatalf("expected error not to be nil")
+	}
+	if want != err.Error() {
+		t.Fatalf("expected error '%s' but got %s", want, err)
+	}
+}
 
 // --- READ --------------------------------------------------------------------
 func Test_ReadMessageFromBuffer_OK(t *testing.T) {
@@ -165,8 +183,9 @@ func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 		t.Fatal("expected error but got none")
 	}
 
-	if err.Error() != "message too long" {
-		t.Fatalf("expected message '%s' but got '%s' instead", msg, err.Error())
+	want := fmt.Sprintf("message length was %d, max size is: %d", len(longmessage), MESSAGE_MAX_SIZE)
+	if err.Error() != want {
+		t.Fatalf("expected message '%s' but got '%s' instead", want, err.Error())
 	}
 
 }

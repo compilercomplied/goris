@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 const PROTOCOL_HEADER int = 4
@@ -54,14 +55,12 @@ func ReadFromBuffer(buffer *bytes.Buffer) (string, error) {
 }
 
 func AppendToBuffer(msg string, buffer *bytes.Buffer) (*bytes.Buffer, error) {
+	if len(msg) > MESSAGE_MAX_SIZE {
+		return nil, fmt.Errorf("message length was %d, max size is: %d", len(msg), MESSAGE_MAX_SIZE)
+	}
 
 	if buffer == nil {
 		buffer = bytes.NewBuffer(make([]byte, 0))
-	}
-
-	msglength := len(msg)
-	if msglength > MESSAGE_MAX_SIZE {
-		return nil, errors.New("message too long")
 	}
 
 	header := make([]byte, PROTOCOL_HEADER)
