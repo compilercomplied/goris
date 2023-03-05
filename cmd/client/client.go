@@ -24,10 +24,16 @@ func main() {
 		if err != nil {
 			requests = 1
 		}
-		port, err = strconv.Atoi(args[2])
 
-		if err != nil {
+		if len(args) == 3 {
+			port, err = strconv.Atoi(args[2])
+
+			if err != nil {
+				port = common.DEF_SERVER_PORT
+			}
+		} else {
 			port = common.DEF_SERVER_PORT
+
 		}
 	}
 
