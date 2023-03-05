@@ -36,13 +36,13 @@ These are the basic conceptual components that are in place here.
 
 The communication protocol is a very simple one.
 
-Reserve the 4 initial bytes to communicate the payload length. Follows the amount of fragments that the message contains, and then each fragment is defined by the ordered tuple of (length, fragment).
+Reserve the 4 initial bytes to communicate the payload length. Follows the amount of fragments that the message contains, and then the fragments themselves. Each fragment is defined by the ordered tuple of (length, fragment).
 
 | Protocol Header | Number of fragments | Fragment length | Fragment length |
 | --------------- | ------------------- | --------------- | --------------- |
 | 4 byte          | 4 byte              | 4 byte          | variable        |
 
-Each fragment is then built into a simple struct that contains the available actions. The fragments are serialized and deserialized in the same order that appears in the defined struct (that is, action->key->value)
+Each request is then built into a struct: 
 
 ```go
 type ProtocolRequest struct {
@@ -51,6 +51,8 @@ type ProtocolRequest struct {
 	Value  *string
 }
 ```
+
+The fragments are serialized and deserialized in the same order that appears in the defined struct; first the action, then the key and, optionally, the value. This is what allows us to GET|SET|DEL a key and its value.
 
 ### Event loop
 
