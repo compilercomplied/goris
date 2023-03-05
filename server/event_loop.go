@@ -163,7 +163,7 @@ func acceptNewConnection(fd int) (*Connection, error) {
 		return nil, err
 	}
 
-	err = setNonBlockingFd(fd)
+	err = setNonBlockingFd(connfd)
 	if err != nil {
 		return nil, err
 	}
