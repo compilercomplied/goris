@@ -42,7 +42,7 @@ Reserve the 4 initial bytes to communicate the payload length. Follows the amoun
 | --------------- | ------------------- | --------------- | --------------- |
 | 4 byte          | 4 byte              | 4 byte          | variable        |
 
-Each fragment is then built into a simple struct that contains the available actions.
+Each fragment is then built into a simple struct that contains the available actions. The fragments are serialized and deserialized in the same order that appears in the defined struct (that is, action->key->value)
 
 ```go
 type ProtocolRequest struct {
