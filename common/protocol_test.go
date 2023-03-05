@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TODO: clean up a little with triple A unit test pattern.
-// TODO: refactor action into one of those fake enums.
-
 func defaultReadSetup(action string, value *string) (ProtocolRequest, *bytes.Buffer) {
 
 	var request *ProtocolRequest
