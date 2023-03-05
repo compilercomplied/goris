@@ -45,7 +45,7 @@ func Test_ReadMessageFromEmptyBuffer_Errors(t *testing.T) {
 		t.Fatal("expected error but got none")
 	}
 
-	if err.Error() != "no requests" {
+	if err.Error() != E_NOREQUESTS {
 		t.Fatalf("expected message '%s' but got '%s' instead", "no more messages", err.Error())
 	}
 
@@ -165,7 +165,7 @@ func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 		t.Fatal("expected error but got none")
 	}
 
-	if err.Error() != "message too long" {
+	if err.Error() != E_MSGLENGTH {
 		t.Fatalf("expected message '%s' but got '%s' instead", msg, err.Error())
 	}
 

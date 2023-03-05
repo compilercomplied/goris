@@ -20,7 +20,7 @@ func ReadRequestFromBuffer(buffer *bytes.Buffer) (data []byte, remaining bool, e
 
 	contentLength := binary.LittleEndian.Uint32(header)
 	if contentLength <= 0 {
-		return data, remaining, errors.New("no requests")
+		return data, remaining, errors.New(E_NOREQUESTS)
 	}
 	data = make([]byte, contentLength)
 
@@ -61,7 +61,7 @@ func AppendToBuffer(msg string, buffer *bytes.Buffer) (*bytes.Buffer, error) {
 
 	msglength := len(msg)
 	if msglength > MESSAGE_MAX_SIZE {
-		return nil, errors.New("message too long")
+		return nil, errors.New(E_MSGLENGTH)
 	}
 
 	header := make([]byte, PROTOCOL_HEADER)

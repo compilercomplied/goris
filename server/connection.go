@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"errors"
+	"goris/common"
 )
 
 // Dumb thing you have to do because of lack of GADTs or enums.
@@ -24,7 +25,7 @@ type Connection struct {
 func NewConnection(fd int, state ConnectionState) (*Connection, error) {
 
 	if fd < 0 {
-		return nil, errors.New("invalid fd value")
+		return nil, errors.New(common.E_INVALIDFD)
 	}
 
 	connection := new(Connection)
