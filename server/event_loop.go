@@ -14,29 +14,29 @@ const POLLING_TIMEOUT_MS int = 3000
 func processOneRequest(connection *Connection) bool {
 
 	// Read the request ----------------------------------------------------------
-	msg, err := common.ReadFromBuffer(&connection.rbuf)
+	req, err := common.ReadFromBuffer(&connection.rbuf)
 
 	if err != nil {
-		return true
+		return false
 	}
 
 	drainedBuffer := bytes.NewBuffer(connection.rbuf.Bytes())
 	connection.rbuf = *drainedBuffer
 
-	fmt.Println("Request received from client -> " + msg)
+	fmt.Println("Request received from client -> " + req.ToString())
 
 	// Echo back its contents ----------------------------------------------------
-	wbuf, err := common.AppendToBuffer("echo: "+msg, &connection.wbuf)
+	wbuf, err := common.AppendToBuffer(req, &connection.wbuf)
 	if err != nil {
-		fmt.Println("Error writing response to buffer" + msg)
-		// Return true anyway because we've finished reading the request.
-		return true
+		fmt.Println("Error writing response to buffer: " + req.ToString())
+		// Return false anyway because we've finished reading the request.
+		return false
 	}
 
 	connection.state = RESPONSE_ST
 	connection.wbuf = *wbuf
 
-	return false
+	return true
 }
 
 func sendResponse(connection *Connection) {
@@ -84,7 +84,7 @@ func flushBuffer(connection *Connection) bool {
 	return false
 }
 
-func readIncomingRequests(connection *Connection) (bool) {
+func readIncomingRequests(connection *Connection) bool {
 
 	// Read the whole fd buffer into our connection read buffer.
 	breakloop := false

@@ -5,6 +5,7 @@ Redis implementation in golang for educational purposes, using the book [Build y
 # Running
 
 There are executables available under the `cmd` dir. One for a test client and another one for the server.
+
 ```sh
 # On the root dir.
 
@@ -16,7 +17,6 @@ go run ./cmd/server
 # Development
 
 To execute the tests run `go test -v ./...` to recursively expand on subdirs. Verbosity flag provides information about the tests that have been run.
-
 
 # General overview
 
@@ -34,12 +34,26 @@ These are the basic conceptual components that are in place here.
 
 ### Protocol spec
 
-The communication protocol is a very simple one. Reserve 4 bytes to set an unsigned integer that defines the total length of the message, and concat that to the actual payload.
+The communication protocol is a very simple one.
 
+Reserve the 4 initial bytes to communicate the payload length. Follows the amount of fragments that the message contains, and then each fragment is defined by the ordered tuple of (length, fragment).
+
+| Protocol Header | Number of fragments | Fragment length | Fragment length |
+| --------------- | ------------------- | --------------- | --------------- |
+| 4 byte          | 4 byte              | 4 byte          | variable        |
+
+Each fragment is then built into a simple struct that contains the available actions.
+
+```go
+type ProtocolRequest struct {
+	Action string
+	Key    string
+	Value  *string
+}
+```
 
 ### Event loop
 
 The event loop is implemented synchronously, although the following diagram denotes our possible point of delegation that will articulate the work done by background threads.
-
 
 ![event loop diagram](.docs/.diagrams/event_loop_flow.png)

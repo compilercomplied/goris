@@ -23,8 +23,12 @@ func sendRequest(fd int) {
 	msgIdx := rand.Intn(len(messages) - 1)
 
 	msg := messages[msgIdx]
+	req, err:= common.NewProtocolRequest("s", "valueKey", &msg)
+	if err != nil {
+		panic(err)
+	}
 
-	wbuffer, err := common.AppendToBuffer(msg, nil)
+	wbuffer, err := common.AppendToBuffer(req, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +51,7 @@ func sendRequest(fd int) {
 		panic(err)
 	}
 
-	fmt.Printf("Response: '%s'\n", response)
+	fmt.Printf("Response: '%s'\n", response.ToString())
 
 }
 

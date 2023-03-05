@@ -6,33 +6,78 @@ import (
 	"testing"
 )
 
-// --- READ --------------------------------------------------------------------
-func Test_ReadMessageFromBuffer_OK(t *testing.T) {
+// TODO: clean up a little with triple A unit test pattern.
+// TODO: refactor action into one of those fake enums.
 
-	const msg string = "hello"
+func defaultReadSetup(action string, value *string) (ProtocolRequest, *bytes.Buffer) {
+
+	var request *ProtocolRequest
+	fragmentLengthv := uint32(3)
+	if action == "s" {
+		request, _ = NewProtocolRequest(action, "myKey", value)
+		fragmentLengthv = uint32(3)
+	} else {
+		request, _ = NewProtocolRequest(action, "myKey", nil)
+		fragmentLengthv = 2
+	}
+
+	header := make([]byte, PROTOCOL_HEADER)
+	var headerv = request.TotalLength()
+	binary.LittleEndian.PutUint32(header, headerv)
+	buffer := bytes.NewBuffer(header)
+
+	fragmentlength := make([]byte, FRAGMENT_HEADER)
+	binary.LittleEndian.PutUint32(fragmentlength, fragmentLengthv)
+	_, _ = buffer.Write(fragmentlength)
+
+	actionLength := make([]byte, FRAGMENT_HEADER)
+	var actionLengthv = uint32(len(request.Action))
+	binary.LittleEndian.PutUint32(actionLength, actionLengthv)
+	_, _ = buffer.Write(actionLength)
+	_, _ = buffer.Write([]byte(request.Action))
+
+	keylength := make([]byte, FRAGMENT_HEADER)
+	var keylengthv = uint32(len(request.Key))
+	binary.LittleEndian.PutUint32(keylength, keylengthv)
+	_, _ = buffer.Write(keylength)
+	_, _ = buffer.Write([]byte(request.Key))
+
+	if action == "s" {
+		value := request.Value
+		valueLength := make([]byte, FRAGMENT_HEADER)
+		var valueLengthv = uint32(len(*value))
+		binary.LittleEndian.PutUint32(valueLength, valueLengthv)
+		_, _ = buffer.Write(valueLength)
+		_, _ = buffer.Write([]byte(*value))
+	}
+
+	return *request, buffer
+}
+
+// --- READ --------------------------------------------------------------------
+func Test_ReadSetRequestFromBuffer_OK(t *testing.T) {
 
 	// --- Setup -----------------------------------------------------------------
-	header := make([]byte, PROTOCOL_HEADER)
-	var headerv = uint32(len(msg))
-	binary.LittleEndian.PutUint32(header, headerv)
-
-	buffer := bytes.NewBuffer(header)
-	_, _ = buffer.Write([]byte(msg))
+	myValue := "myvalue"
+	request, buffer := defaultReadSetup("s", &myValue)
 
 	// --- Execute ---------------------------------------------------------------
-	parsedMessage, err := ReadFromBuffer(buffer)
+	parsedRequest, err := ReadFromBuffer(buffer)
 
 	// --- Assert ----------------------------------------------------------------
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parsedMessage != msg {
-		t.Fatalf("expected message '%s' but got '%s' instead", msg, parsedMessage)
+	parsedLength := parsedRequest.TotalLength()
+	reqLength := request.TotalLength()
+
+	if parsedLength != reqLength {
+		t.Fatalf("expected length '%v' but got '%v' instead", parsedLength, reqLength)
 	}
 
 }
 
-func Test_ReadMessageFromEmptyBuffer_Errors(t *testing.T) {
+func Test_ReadRequestFromEmptyBuffer_Errors(t *testing.T) {
 
 	// --- Setup -----------------------------------------------------------------
 	buffer := bytes.NewBuffer(make([]byte, 10))
@@ -51,27 +96,34 @@ func Test_ReadMessageFromEmptyBuffer_Errors(t *testing.T) {
 
 }
 
-func Test_ReadMessageFromBuffer_MovesCursor(t *testing.T) {
+func Test_ReadRequestFromBuffer_MovesCursor(t *testing.T) {
 
-	const msg string = "hello"
-
+	myValue := "myvalue"
 	// --- Setup -----------------------------------------------------------------
-	header := make([]byte, PROTOCOL_HEADER)
-	var headerv = uint32(len(msg))
-	binary.LittleEndian.PutUint32(header, headerv)
+	firstreq, buffer := defaultReadSetup("s", &myValue)
+	secondreq, secondbuffer := defaultReadSetup("d", &myValue)
 
-	buffer := bytes.NewBuffer(header)
-	_, _ = buffer.Write([]byte(msg))
+	_, _ = buffer.Write(secondbuffer.Bytes())
 
 	// --- Execute ---------------------------------------------------------------
-	_, _ = ReadFromBuffer(buffer)
+	firstResponse, err := ReadFromBuffer(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondResponse, err := ReadFromBuffer(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ReadFromBuffer(buffer) // This one triggers an EOF.
 
 	// --- Assert ----------------------------------------------------------------
-	nomsg, err := ReadFromBuffer(buffer)
 
-	if nomsg == msg {
-		t.Fatalf("expected no message but got '%s' instead", nomsg)
+	if firstResponse.Key != firstreq.Key {
+		t.Fatalf("expected first key '%s' but got '%s' instead", firstreq.Key, firstResponse.Key)
+	}
 
+	if secondResponse.Key != secondreq.Key {
+		t.Fatalf("expected second key '%s' but got '%s' instead", secondreq.Key, secondResponse.Key)
 	}
 
 	if err.Error() != "EOF" {
@@ -82,69 +134,44 @@ func Test_ReadMessageFromBuffer_MovesCursor(t *testing.T) {
 
 // --- APPEND ------------------------------------------------------------------
 func Test_AppendToNilBuffer_OK(t *testing.T) {
-	const msg string = "hello"
+	myValue := "myvalue"
+	req, setupBuffer := defaultReadSetup("s", &myValue)
 
 	// --- Execute ---------------------------------------------------------------
-	buffer, err := AppendToBuffer(msg, nil)
+	writtenBuffer, err := AppendToBuffer(&req, nil)
 
 	// --- Assert ----------------------------------------------------------------
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	header := make([]byte, PROTOCOL_HEADER)
-	_, err = buffer.Read(header)
-	if err != nil {
-		t.Fatalf("found error '%s'", err.Error())
+	if setupBuffer.Bytes()[0] != writtenBuffer.Bytes()[0] {
+		t.Fatalf("written buffer does not contain the correct data")
 	}
-
-	contentLength := binary.LittleEndian.Uint32(header)
-	data := make([]byte, contentLength)
-	_, err = buffer.Read(data)
-	if err != nil {
-		t.Fatalf("found error '%s'", err.Error())
-	}
-
-	parsedMessage := string(data)
-
-	if parsedMessage != msg {
-		t.Fatalf("expected message '%s' but got '%s' instead", msg, parsedMessage)
+	if setupBuffer.Len() != writtenBuffer.Len() {
+		t.Fatalf("written buffer does not have the expected length")
 	}
 
 }
 
 func Test_AppendToExistingBuffer_OK(t *testing.T) {
-	const msg string = "hello"
-	existingBuffer := bytes.NewBuffer(make([]byte, 0))
-	existingBuffer.WriteByte(1)
+
+	myValue := "myvalue"
+	req, setupBuffer := defaultReadSetup("s", &myValue)
+	// Maintains the original bytes length.
+	comparisonBuffer := setupBuffer.Bytes()
 
 	// --- Execute ---------------------------------------------------------------
-	buffer, err := AppendToBuffer(msg, existingBuffer)
-	// Remove the leading byte. If the data is not being appended it
-	_, _ = existingBuffer.ReadByte()
+	// Write the same request twice to double its length.
+	buffer, err := AppendToBuffer(&req, setupBuffer)
 
 	// --- Assert ----------------------------------------------------------------
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	header := make([]byte, PROTOCOL_HEADER)
-	_, err = buffer.Read(header)
-	if err != nil {
-		t.Fatalf("found error '%s'", err.Error())
-	}
-
-	contentLength := binary.LittleEndian.Uint32(header)
-	data := make([]byte, contentLength)
-	_, err = buffer.Read(data)
-	if err != nil {
-		t.Fatalf("found error '%s'", err.Error())
-	}
-
-	parsedMessage := string(data)
-
-	if parsedMessage != msg {
-		t.Fatalf("expected message '%s' but got '%s' instead", msg, parsedMessage)
+	if len(comparisonBuffer)*2 != buffer.Len() {
+		t.Fatalf("the written buffer does not have the expected length")
 	}
 
 }
@@ -152,13 +179,15 @@ func Test_AppendToExistingBuffer_OK(t *testing.T) {
 func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 
 	const msg string = "hello"
-	var longmessage string
-	for i := 0; i < MESSAGE_MAX_SIZE; i++ {
-		longmessage = msg + longmessage
+	var myValue string
+	for i := uint32(0); i < MESSAGE_MAX_SIZE; i++ {
+		myValue = msg + myValue
 	}
 
+	req, _ := defaultReadSetup("s", &myValue)
+
 	// --- Execute ---------------------------------------------------------------
-	_, err := AppendToBuffer(longmessage, nil)
+	_, err := AppendToBuffer(&req, nil)
 
 	// --- Assert ----------------------------------------------------------------
 	if err == nil {
@@ -174,12 +203,12 @@ func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 // --- SLICE -------------------------------------------------------------------
 func Test_SliceRequestFromBuffer_OK(t *testing.T) {
 
-	const firstmsg string = "first message"
-	const secondmsg string = "second message"
-
+	myValue := "myvalue"
 	// --- Setup -----------------------------------------------------------------
-	buffer, _ := AppendToBuffer(firstmsg, nil)
-	buffer, _ = AppendToBuffer(secondmsg, buffer)
+	firstreq, buffer := defaultReadSetup("s", &myValue)
+	secondreq, secondbuffer := defaultReadSetup("d", &myValue)
+
+	_, _ = buffer.Write(secondbuffer.Bytes())
 
 	// --- Execute ---------------------------------------------------------------
 	first, remaining, err := ReadRequestFromBuffer(buffer)
@@ -197,12 +226,12 @@ func Test_SliceRequestFromBuffer_OK(t *testing.T) {
 		t.Fatalf("there were more requests that went undetected")
 	}
 
-	if firstResponse != firstmsg {
-		t.Fatalf("expected message '%s' but got '%s' instead", firstmsg, firstResponse)
+	if firstResponse.Key != firstreq.Key {
+		t.Fatalf("expected key '%s' but got '%s' instead", firstreq.Key, firstResponse.Key)
 	}
 
-	if secondResponse != secondmsg {
-		t.Fatalf("expected message '%s' but got '%s' instead", secondmsg, secondResponse)
+	if secondResponse.Key != secondreq.Key {
+		t.Fatalf("expected key '%s' but got '%s' instead", secondreq.Key, secondResponse.Key)
 	}
 
 }

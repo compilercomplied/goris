@@ -4,12 +4,73 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
-const PROTOCOL_HEADER int = 4
-const MESSAGE_MAX_SIZE int = 4096
-const MESSAGE_LENGTH int = PROTOCOL_HEADER + MESSAGE_MAX_SIZE + 1
+const PROTOCOL_HEADER uint32 = 4
+const FRAGMENT_HEADER uint32 = 4
+const MESSAGE_MAX_SIZE uint32 = 4096
+const MESSAGE_LENGTH uint32 = PROTOCOL_HEADER + MESSAGE_MAX_SIZE + 1
 
+type ProtocolRequest struct {
+	Action string
+	Key    string
+	Value  *string
+}
+
+func (req *ProtocolRequest) TotalLength() uint32 {
+	if req.Value != nil {
+		return uint32(len(req.Action)+len(req.Key)+len(*(req.Value))) + (FRAGMENT_HEADER * 3) + PROTOCOL_HEADER
+	} else {
+		return uint32(len(req.Action)+len(req.Key)) + (FRAGMENT_HEADER * 2) + PROTOCOL_HEADER
+	}
+}
+func (req *ProtocolRequest) ToString() string {
+	return fmt.Sprintf("[%v] => ['%v']:['%v']", req.Action, req.Key, *(req.Value))
+}
+
+func NewProtocolRequest(action string, key string, value *string) (*ProtocolRequest, error) {
+
+	switch action {
+	case "s":
+		if key == "" {
+			return nil, errors.New(E_INVALIDKEY)
+		} else if value == nil || *value == "" {
+			return nil, errors.New(E_INVALIDVALUE)
+		} else {
+			protocolReq := new(ProtocolRequest)
+			protocolReq.Action = action
+			protocolReq.Key = key
+			protocolReq.Value = value
+			return protocolReq, nil
+		}
+	case "g":
+		if key == "" {
+			return nil, errors.New(E_INVALIDKEY)
+		} else {
+			protocolReq := new(ProtocolRequest)
+			protocolReq.Action = action
+			protocolReq.Key = key
+			protocolReq.Value = value
+			return protocolReq, nil
+		}
+	case "d":
+		if key == "" {
+			return nil, errors.New(E_INVALIDKEY)
+		} else {
+			protocolReq := new(ProtocolRequest)
+			protocolReq.Action = action
+			protocolReq.Key = key
+			protocolReq.Value = value
+			return protocolReq, nil
+		}
+	default:
+		return nil, fmt.Errorf(E_UNKNOWNREQ, action)
+	}
+
+}
+
+// --- Read --------------------------------------------------------------------
 func ReadRequestFromBuffer(buffer *bytes.Buffer) (data []byte, remaining bool, err error) {
 
 	header := make([]byte, PROTOCOL_HEADER)
@@ -42,41 +103,146 @@ func ReadRequestFromBuffer(buffer *bytes.Buffer) (data []byte, remaining bool, e
 
 }
 
-func ReadFromBuffer(buffer *bytes.Buffer) (string, error) {
+func ReadFromBuffer(buffer *bytes.Buffer) (*ProtocolRequest, error) {
 
+	// Extract the whole request first. It has all the fragments inside.
 	data, _, err := ReadRequestFromBuffer(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip the header; we only want the fragments inside the payload.
+	requestBuffer := bytes.NewBuffer(data[PROTOCOL_HEADER:])
+
+	fragmentsRaw := make([]byte, FRAGMENT_HEADER)
+	_, err = requestBuffer.Read(fragmentsRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	fragments := binary.LittleEndian.Uint16(fragmentsRaw)
+
+	// Parse all the fragments before feeding them to our ProtocolRequest.
+	// Maintain the same write order Action-Key-Value?.
+	if fragments != 2 && fragments != 3 {
+		return nil, errors.New(E_REQLENGTH)
+	}
+
+	action, err := readFragment(requestBuffer)
+	if err != nil {
+		return nil, err
+	}
+	key, err := readFragment(requestBuffer)
+	if err != nil {
+		return nil, err
+	}
+	var value *string
+	if fragments == 3 {
+		val, err := readFragment(requestBuffer)
+		if err != nil {
+			return nil, err
+		}
+
+		value = &val
+	}
+
+	return NewProtocolRequest(action, key, value)
+
+}
+
+func readFragment(buffer *bytes.Buffer) (string, error) {
+
+	header := make([]byte, FRAGMENT_HEADER)
+	_, err := buffer.Read(header)
 	if err != nil {
 		return "", err
 	}
 
-	// Skip the header; we only want the payload.
-	return string(data[PROTOCOL_HEADER:]), nil
+	contentLength := binary.LittleEndian.Uint32(header)
+	if contentLength <= 0 {
+		return "", err
+	}
+
+	data := make([]byte, contentLength)
+
+	_, err = buffer.Read(data)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), err
 }
 
-func AppendToBuffer(msg string, buffer *bytes.Buffer) (*bytes.Buffer, error) {
+// --- Write -------------------------------------------------------------------
+func AppendToBuffer(req *ProtocolRequest, buffer *bytes.Buffer) (*bytes.Buffer, error) {
 
 	if buffer == nil {
 		buffer = bytes.NewBuffer(make([]byte, 0))
 	}
 
-	msglength := len(msg)
-	if msglength > MESSAGE_MAX_SIZE {
+	reqLength := req.TotalLength()
+	if reqLength > MESSAGE_MAX_SIZE {
 		return nil, errors.New(E_MSGLENGTH)
 	}
 
 	header := make([]byte, PROTOCOL_HEADER)
-	var headerv = uint32(len(msg))
+	var headerv = reqLength
 	binary.LittleEndian.PutUint32(header, headerv)
 
 	_, err := buffer.Write(header)
 	if err != nil {
 		return nil, err
 	}
-	_, err = buffer.Write([]byte(msg))
+
+	fragmentNo := uint32(2)
+	if req.Action == "s" {
+		fragmentNo = 3
+	}
+	fragmentheader := make([]byte, FRAGMENT_HEADER)
+	binary.LittleEndian.PutUint32(fragmentheader, fragmentNo)
+
+	// Maintain the same read order Action-Key-Value?.
+	_, err = buffer.Write(fragmentheader)
 	if err != nil {
 		return nil, err
 	}
 
+	err = writeFragment(req.Action, buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeFragment(req.Key, buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	if fragmentNo == 3 {
+		err = writeFragment(*req.Value, buffer)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return buffer, nil
 
+}
+
+func writeFragment(msg string, buffer *bytes.Buffer) error {
+
+	header := make([]byte, FRAGMENT_HEADER)
+	var headerv = len(msg)
+	binary.LittleEndian.PutUint32(header, uint32(headerv))
+
+	_, err := buffer.Write(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = buffer.Write([]byte(msg))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
