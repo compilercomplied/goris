@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"goris/common"
+	"goris/protocol"
 
 	"golang.org/x/sys/unix"
 )
@@ -14,7 +14,7 @@ const POLLING_TIMEOUT_MS int = 3000
 func processOneRequest(connection *Connection) bool {
 
 	// Read the request ----------------------------------------------------------
-	req, err := common.ReadFromBuffer(&connection.rbuf)
+	req, err := protocol.ReadFromBuffer(&connection.rbuf)
 
 	if err != nil {
 		return false
@@ -26,7 +26,7 @@ func processOneRequest(connection *Connection) bool {
 	fmt.Println("Request received from client -> " + req.ToString())
 
 	// Echo back its contents ----------------------------------------------------
-	wbuf, err := common.AppendToBuffer(req, &connection.wbuf)
+	wbuf, err := protocol.AppendToBuffer(req, &connection.wbuf)
 	if err != nil {
 		fmt.Println("Error writing response to buffer: " + req.ToString())
 		// Return false anyway because we've finished reading the request.
@@ -55,7 +55,7 @@ func flushBuffer(connection *Connection) bool {
 	var errno error
 	for loop := true; loop; loop = !breakloop {
 
-		response, remaining, err := common.ReadRequestFromBuffer(&connection.wbuf)
+		response, remaining, err := protocol.ReadRequestFromBuffer(&connection.wbuf)
 
 		if err != nil {
 			break
@@ -79,7 +79,7 @@ func flushBuffer(connection *Connection) bool {
 	}
 
 	connection.state = REQUEST_ST
-	connection.wbuf = *bytes.NewBuffer(make([]byte, common.MESSAGE_MAX_SIZE))
+	connection.wbuf = *bytes.NewBuffer(make([]byte, protocol.MESSAGE_MAX_SIZE))
 
 	return false
 }

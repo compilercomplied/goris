@@ -1,17 +1,14 @@
-package common
+package protocol
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"goris/common"
 )
 
-const PROTOCOL_HEADER uint32 = 4
-const FRAGMENT_HEADER uint32 = 4
-const MESSAGE_MAX_SIZE uint32 = 4096
-const MESSAGE_LENGTH uint32 = PROTOCOL_HEADER + MESSAGE_MAX_SIZE + 1
-
+// --- Type --------------------------------------------------------------------
 type ProtocolRequest struct {
 	Action string
 	Key    string
@@ -25,6 +22,7 @@ func (req *ProtocolRequest) TotalLength() uint32 {
 		return uint32(len(req.Action)+len(req.Key)) + (FRAGMENT_HEADER * 2) + PROTOCOL_HEADER
 	}
 }
+
 func (req *ProtocolRequest) ToString() string {
 	if req.Value == nil {
 		return fmt.Sprintf("[%v] => ['%v']", req.Action, req.Key)
@@ -38,9 +36,9 @@ func NewProtocolRequest(action string, key string, value *string) (*ProtocolRequ
 	switch action {
 	case "s":
 		if key == "" {
-			return nil, errors.New(E_INVALIDKEY)
+			return nil, errors.New(common.E_INVALIDKEY)
 		} else if value == nil || *value == "" {
-			return nil, errors.New(E_INVALIDVALUE)
+			return nil, errors.New(common.E_INVALIDVALUE)
 		} else {
 			protocolReq := new(ProtocolRequest)
 			protocolReq.Action = action
@@ -50,7 +48,7 @@ func NewProtocolRequest(action string, key string, value *string) (*ProtocolRequ
 		}
 	case "g":
 		if key == "" {
-			return nil, errors.New(E_INVALIDKEY)
+			return nil, errors.New(common.E_INVALIDKEY)
 		} else {
 			protocolReq := new(ProtocolRequest)
 			protocolReq.Action = action
@@ -60,7 +58,7 @@ func NewProtocolRequest(action string, key string, value *string) (*ProtocolRequ
 		}
 	case "d":
 		if key == "" {
-			return nil, errors.New(E_INVALIDKEY)
+			return nil, errors.New(common.E_INVALIDKEY)
 		} else {
 			protocolReq := new(ProtocolRequest)
 			protocolReq.Action = action
@@ -69,9 +67,8 @@ func NewProtocolRequest(action string, key string, value *string) (*ProtocolRequ
 			return protocolReq, nil
 		}
 	default:
-		return nil, fmt.Errorf(E_UNKNOWNREQ, action)
+		return nil, fmt.Errorf(common.E_UNKNOWNREQ, action)
 	}
-
 }
 
 // --- Read --------------------------------------------------------------------
@@ -85,7 +82,7 @@ func ReadRequestFromBuffer(buffer *bytes.Buffer) (data []byte, remaining bool, e
 
 	contentLength := binary.LittleEndian.Uint32(header)
 	if contentLength <= 0 {
-		return data, remaining, errors.New(E_NOREQUESTS)
+		return data, remaining, errors.New(common.E_NOREQUESTS)
 	}
 	data = make([]byte, contentLength)
 
@@ -104,7 +101,6 @@ func ReadRequestFromBuffer(buffer *bytes.Buffer) (data []byte, remaining bool, e
 
 	// Return the fully formed response; [header][data].
 	return append(header, data...), remaining, nil
-
 }
 
 func ReadFromBuffer(buffer *bytes.Buffer) (*ProtocolRequest, error) {
@@ -129,7 +125,7 @@ func ReadFromBuffer(buffer *bytes.Buffer) (*ProtocolRequest, error) {
 	// Parse all the fragments before feeding them to our ProtocolRequest.
 	// Maintain the same write order Action-Key-Value?.
 	if fragments != 2 && fragments != 3 {
-		return nil, errors.New(E_REQLENGTH)
+		return nil, errors.New(common.E_REQLENGTH)
 	}
 
 	action, err := readFragment(requestBuffer)
@@ -151,7 +147,6 @@ func ReadFromBuffer(buffer *bytes.Buffer) (*ProtocolRequest, error) {
 	}
 
 	return NewProtocolRequest(action, key, value)
-
 }
 
 func readFragment(buffer *bytes.Buffer) (string, error) {
@@ -186,7 +181,7 @@ func AppendToBuffer(req *ProtocolRequest, buffer *bytes.Buffer) (*bytes.Buffer, 
 
 	reqLength := req.TotalLength()
 	if reqLength > MESSAGE_MAX_SIZE {
-		return nil, errors.New(E_MSGLENGTH)
+		return nil, errors.New(common.E_MSGLENGTH)
 	}
 
 	header := make([]byte, PROTOCOL_HEADER)
@@ -229,7 +224,6 @@ func AppendToBuffer(req *ProtocolRequest, buffer *bytes.Buffer) (*bytes.Buffer, 
 	}
 
 	return buffer, nil
-
 }
 
 func writeFragment(msg string, buffer *bytes.Buffer) error {

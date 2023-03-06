@@ -5,13 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"goris/common"
+	"goris/protocol"
 
 	"golang.org/x/sys/unix"
 )
 
-func sendRequest(fd int, request *common.ProtocolRequest) {
+func sendRequest(fd int, request *protocol.ProtocolRequest) {
 
-	wbuffer, err := common.AppendToBuffer(request, nil)
+	wbuffer, err := protocol.AppendToBuffer(request, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -22,14 +23,14 @@ func sendRequest(fd int, request *common.ProtocolRequest) {
 		panic(err)
 	}
 
-	bufferlength := common.MESSAGE_MAX_SIZE + common.PROTOCOL_HEADER + 1
+	bufferlength := protocol.MESSAGE_MAX_SIZE + protocol.PROTOCOL_HEADER + 1
 	buffer := bytes.NewBuffer(make([]byte, bufferlength))
 	_, err = unix.Read(fd, buffer.Bytes())
 	if err != nil {
 		panic(err)
 	}
 
-	response, err := common.ReadFromBuffer(buffer)
+	response, err := protocol.ReadFromBuffer(buffer)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +39,7 @@ func sendRequest(fd int, request *common.ProtocolRequest) {
 
 }
 
-func ExecuteClient(request *common.ProtocolRequest) {
+func ExecuteClient(request *protocol.ProtocolRequest) {
 
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
 

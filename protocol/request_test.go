@@ -1,8 +1,9 @@
-package common
+package protocol
 
 import (
 	"bytes"
 	"encoding/binary"
+	"goris/common"
 	"testing"
 )
 
@@ -87,7 +88,7 @@ func Test_ReadRequestFromEmptyBuffer_Errors(t *testing.T) {
 		t.Fatal("expected error but got none")
 	}
 
-	if err.Error() != E_NOREQUESTS {
+	if err.Error() != common.E_NOREQUESTS {
 		t.Fatalf("expected message '%s' but got '%s' instead", "no more messages", err.Error())
 	}
 
@@ -193,7 +194,7 @@ func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 		t.Fatal("expected error but got none")
 	}
 
-	if err.Error() != E_MSGLENGTH {
+	if err.Error() != common.E_MSGLENGTH {
 		t.Fatalf("expected message '%s' but got '%s' instead", msg, err.Error())
 	}
 

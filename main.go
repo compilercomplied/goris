@@ -5,7 +5,7 @@ import (
 	"goris/server"
 )
 
-// This file is used only for debugging purposes. Entrypoints are provided in 
+// This file is used only for debugging purposes. Entrypoints are provided in
 // the `cmd` directory.
 
 func main() {
