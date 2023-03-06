@@ -16,6 +16,10 @@ go run ./cmd/server
 go run ./cmd/client g key value
 ```
 
+An example flow for the client bin below:
+
+![example client flow](.docs/.diagrams/example_client_flow.png)
+
 # Development
 
 To execute the tests run `go test -v ./...` to recursively expand on subdirs. Verbosity flag provides information about the tests that have been run.
@@ -28,7 +32,7 @@ The server is structured around an event loop that [poll](https://man7.org/linux
 
 ## Available actions
 
-For now the server simply echoes back the message.
+The server supports setting a key:value pair, retrieving the value of a key or deleting it.
 
 ## Building blocks
 
@@ -44,7 +48,7 @@ Reserve the 4 initial bytes to communicate the payload length. Follows the amoun
 | --------------- | ------------------- | --------------- | --------------- |
 | 4 byte          | 4 byte              | 4 byte          | variable        |
 
-Each request is then built into a struct: 
+Each request is then built into a struct:
 
 ```go
 type ProtocolRequest struct {
