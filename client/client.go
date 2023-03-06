@@ -30,7 +30,7 @@ func sendRequest(fd int, request *protocol.ProtocolRequest) {
 		panic(err)
 	}
 
-	response, err := protocol.ReadFromBuffer(buffer)
+	response, err := protocol.ReadResponseFromBuffer(buffer)
 	if err != nil {
 		panic(err)
 	}

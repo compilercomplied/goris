@@ -26,7 +26,10 @@ func processOneRequest(connection *Connection) bool {
 	fmt.Println("Request received from client -> " + req.ToString())
 
 	// Echo back its contents ----------------------------------------------------
-	wbuf, err := protocol.AppendToBuffer(req, &connection.wbuf)
+
+	resp:=new(protocol.ProtocolResponse)
+	resp.Message = "echo -> " + req.ToString()
+	wbuf, err := protocol.AppendResponseToBuffer(resp, &connection.wbuf)
 	if err != nil {
 		fmt.Println("Error writing response to buffer: " + req.ToString())
 		// Return false anyway because we've finished reading the request.
