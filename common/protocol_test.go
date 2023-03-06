@@ -54,11 +54,11 @@ func defaultReadSetup(action string, value *string) (ProtocolRequest, *bytes.Buf
 // --- READ --------------------------------------------------------------------
 func Test_ReadSetRequestFromBuffer_OK(t *testing.T) {
 
-	// --- Setup -----------------------------------------------------------------
+	// --- Arrange ---------------------------------------------------------------
 	myValue := "myvalue"
 	request, buffer := defaultReadSetup("s", &myValue)
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	parsedRequest, err := ReadFromBuffer(buffer)
 
 	// --- Assert ----------------------------------------------------------------
@@ -76,10 +76,10 @@ func Test_ReadSetRequestFromBuffer_OK(t *testing.T) {
 
 func Test_ReadRequestFromEmptyBuffer_Errors(t *testing.T) {
 
-	// --- Setup -----------------------------------------------------------------
+	// --- Arrange ---------------------------------------------------------------
 	buffer := bytes.NewBuffer(make([]byte, 10))
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	_, err := ReadFromBuffer(buffer)
 
 	// --- Assert ----------------------------------------------------------------
@@ -95,14 +95,14 @@ func Test_ReadRequestFromEmptyBuffer_Errors(t *testing.T) {
 
 func Test_ReadRequestFromBuffer_MovesCursor(t *testing.T) {
 
+	// --- Arrange ---------------------------------------------------------------
 	myValue := "myvalue"
-	// --- Setup -----------------------------------------------------------------
 	firstreq, buffer := defaultReadSetup("s", &myValue)
 	secondreq, secondbuffer := defaultReadSetup("d", &myValue)
 
 	_, _ = buffer.Write(secondbuffer.Bytes())
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	firstResponse, err := ReadFromBuffer(buffer)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,6 @@ func Test_ReadRequestFromBuffer_MovesCursor(t *testing.T) {
 	_, err = ReadFromBuffer(buffer) // This one triggers an EOF.
 
 	// --- Assert ----------------------------------------------------------------
-
 	if firstResponse.Key != firstreq.Key {
 		t.Fatalf("expected first key '%s' but got '%s' instead", firstreq.Key, firstResponse.Key)
 	}
@@ -131,10 +130,11 @@ func Test_ReadRequestFromBuffer_MovesCursor(t *testing.T) {
 
 // --- APPEND ------------------------------------------------------------------
 func Test_AppendToNilBuffer_OK(t *testing.T) {
+	// --- Arrange ---------------------------------------------------------------
 	myValue := "myvalue"
 	req, setupBuffer := defaultReadSetup("s", &myValue)
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	writtenBuffer, err := AppendToBuffer(&req, nil)
 
 	// --- Assert ----------------------------------------------------------------
@@ -153,12 +153,13 @@ func Test_AppendToNilBuffer_OK(t *testing.T) {
 
 func Test_AppendToExistingBuffer_OK(t *testing.T) {
 
+	// --- Arrange ---------------------------------------------------------------
 	myValue := "myvalue"
 	req, setupBuffer := defaultReadSetup("s", &myValue)
 	// Maintains the original bytes length.
 	comparisonBuffer := setupBuffer.Bytes()
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	// Write the same request twice to double its length.
 	buffer, err := AppendToBuffer(&req, setupBuffer)
 
@@ -175,6 +176,7 @@ func Test_AppendToExistingBuffer_OK(t *testing.T) {
 
 func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 
+	// --- Arrange ---------------------------------------------------------------
 	const msg string = "hello"
 	var myValue string
 	for i := uint32(0); i < MESSAGE_MAX_SIZE; i++ {
@@ -183,7 +185,7 @@ func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 
 	req, _ := defaultReadSetup("s", &myValue)
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	_, err := AppendToBuffer(&req, nil)
 
 	// --- Assert ----------------------------------------------------------------
@@ -200,14 +202,14 @@ func Test_AppendToBuffer_SizeLimit_Errors(t *testing.T) {
 // --- SLICE -------------------------------------------------------------------
 func Test_SliceRequestFromBuffer_OK(t *testing.T) {
 
+	// --- Arrange ---------------------------------------------------------------
 	myValue := "myvalue"
-	// --- Setup -----------------------------------------------------------------
 	firstreq, buffer := defaultReadSetup("s", &myValue)
 	secondreq, secondbuffer := defaultReadSetup("d", &myValue)
 
 	_, _ = buffer.Write(secondbuffer.Bytes())
 
-	// --- Execute ---------------------------------------------------------------
+	// --- Act -------------------------------------------------------------------
 	first, remaining, err := ReadRequestFromBuffer(buffer)
 
 	if err != nil {
@@ -215,7 +217,6 @@ func Test_SliceRequestFromBuffer_OK(t *testing.T) {
 	}
 
 	// --- Assert ----------------------------------------------------------------
-
 	firstResponse, _ := ReadFromBuffer(bytes.NewBuffer(first))
 	secondResponse, _ := ReadFromBuffer(buffer)
 
