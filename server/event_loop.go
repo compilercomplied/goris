@@ -11,6 +11,8 @@ import (
 
 const POLLING_TIMEOUT_MS int = 3000
 
+var serverdata = make(map[string]string)
+
 func processOneRequest(connection *Connection) bool {
 
 	// Read the request ----------------------------------------------------------
@@ -25,10 +27,28 @@ func processOneRequest(connection *Connection) bool {
 
 	fmt.Println("Request received from client -> " + req.ToString())
 
-	// Echo back its contents ----------------------------------------------------
+	// Do the thing --------------------------------------------------------------
+	var message string
+	var contains bool
+	switch req.Action {
+	case "s":
+		serverdata[req.Key] = *req.Value
+		message = fmt.Sprintf("assigned key [%s] a value of '%s'", req.Key, *req.Value)
+	case "g":
+		message, contains = serverdata[req.Key]
+		if !contains {
+			message = fmt.Sprintf("no data for key [%s]", req.Key)
+		}
+	case "d":
+		delete(serverdata, req.Key)
+		message = fmt.Sprintf("deleted key [%s]", req.Key)
+	default:
+		fmt.Printf("Unknown req type while processing request : %s", req.Key)
+		message = "unknown request action"
+	}
 
-	resp:=new(protocol.ProtocolResponse)
-	resp.Message = "echo -> " + req.ToString()
+	resp := new(protocol.ProtocolResponse)
+	resp.Message = message
 	wbuf, err := protocol.AppendResponseToBuffer(resp, &connection.wbuf)
 	if err != nil {
 		fmt.Println("Error writing response to buffer: " + req.ToString())
