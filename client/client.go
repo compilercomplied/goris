@@ -5,35 +5,18 @@ import (
 	"encoding/binary"
 	"fmt"
 	"goris/common"
-	"math/rand"
-	"sync"
 
 	"golang.org/x/sys/unix"
 )
 
-var messages []string = []string{
-	"Excuse me sir",
-	"do you have a moment",
-	"to talk about our lord and saviour",
-	"Richard Stallman?",
-}
+func sendRequest(fd int, request *common.ProtocolRequest) {
 
-func sendRequest(fd int) {
-
-	msgIdx := rand.Intn(len(messages) - 1)
-
-	msg := messages[msgIdx]
-	req, err:= common.NewProtocolRequest("s", "valueKey", &msg)
+	wbuffer, err := common.AppendToBuffer(request, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	wbuffer, err := common.AppendToBuffer(req, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Request: '%s'\n", msg)
+	fmt.Printf("Request: '%s'\n", request.ToString())
 	_, err = unix.Write(fd, wbuffer.Bytes())
 	if err != nil {
 		panic(err)
@@ -55,7 +38,7 @@ func sendRequest(fd int) {
 
 }
 
-func ExecuteClient(requests int, port int) {
+func ExecuteClient(request *common.ProtocolRequest) {
 
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_STREAM, 0)
 
@@ -70,7 +53,7 @@ func ExecuteClient(requests int, port int) {
 	hostAddr := make([]byte, 4)
 	binary.BigEndian.PutUint32(hostAddr, 0)
 	addr := unix.SockaddrInet4{
-		Port: port,
+		Port: common.DEF_SERVER_PORT,
 		Addr: [4]byte(hostAddr),
 	}
 
@@ -81,19 +64,6 @@ func ExecuteClient(requests int, port int) {
 	}
 	fmt.Println("Connected to socket")
 
-	var waitGroup sync.WaitGroup
-	for i := 0; i < requests; i++ {
-		waitGroup.Add(1)
-
-		go func(filedescriptor int) {
-			defer waitGroup.Done()
-			sendRequest(filedescriptor)
-
-		}(fd)
-
-	}
-
-	waitGroup.Wait()
-	unix.Close(fd)
+	sendRequest(fd, request)
 
 }

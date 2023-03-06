@@ -26,7 +26,11 @@ func (req *ProtocolRequest) TotalLength() uint32 {
 	}
 }
 func (req *ProtocolRequest) ToString() string {
-	return fmt.Sprintf("[%v] => ['%v']:['%v']", req.Action, req.Key, *(req.Value))
+	if req.Value == nil {
+		return fmt.Sprintf("[%v] => ['%v']", req.Action, req.Key)
+	} else {
+		return fmt.Sprintf("[%v] => ['%v']:['%v']", req.Action, req.Key, *(req.Value))
+	}
 }
 
 func NewProtocolRequest(action string, key string, value *string) (*ProtocolRequest, error) {

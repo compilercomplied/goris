@@ -4,39 +4,30 @@ import (
 	"goris/client"
 	"goris/common"
 	"os"
-	"strconv"
 )
+
+func parseArgs(args []string) (*common.ProtocolRequest, error) {
+
+	// Recklessly ignore fail scenarios. This stunt is performed by experts, 
+	// do not emulate at home.
+	if len(args) == 2 {
+		return common.NewProtocolRequest(args[0], args[1], nil)
+	} else {
+		val := args[2]
+		return common.NewProtocolRequest(args[0], args[1], &val)
+	}
+
+}
 
 func main() {
 
-	args := os.Args
+	req,err := parseArgs(os.Args[1:])
 
-	var port int
-	var requests int
-	var err error = nil
+	if err != nil { panic(err)}
 
-	// First arg is a reference to the binary itself.
-	if len(args) == 1 {
-		requests = 1
-		port = common.DEF_SERVER_PORT
-	} else {
-		requests, err = strconv.Atoi(args[1])
-		if err != nil {
-			requests = 1
-		}
 
-		if len(args) == 3 {
-			port, err = strconv.Atoi(args[2])
 
-			if err != nil {
-				port = common.DEF_SERVER_PORT
-			}
-		} else {
-			port = common.DEF_SERVER_PORT
-
-		}
-	}
-
-	client.ExecuteClient(requests, port)
+	client.ExecuteClient(req)
 
 }
+

@@ -9,9 +9,11 @@ There are executables available under the `cmd` dir. One for a test client and a
 ```sh
 # On the root dir.
 
-go run ./cmd/client
-
 go run ./cmd/server
+
+# action-key-value
+# available actions: g|s|d
+go run ./cmd/client g key value
 ```
 
 # Development
